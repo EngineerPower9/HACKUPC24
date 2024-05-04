@@ -13,16 +13,71 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 
+import android.content.Intent
+import android.widget.Button
+import android.widget.Toast
+import okhttp3.Credentials
+import okhttp3.OkHttpClient
+import okhttp3.logging.HttpLoggingInterceptor
+import retrofit2.Call
+import retrofit2.Callback
+import retrofit2.Response
+import retrofit2.Retrofit
+import retrofit2.converter.scalars.ScalarsConverterFactory
+import retrofit2.http.Body
+import retrofit2.http.POST
+
+
+interface InfluxDBService {
+    @POST("write?db=UABDB")
+    fun writeData(@Body data: String): Call<Void>
+}
 
 class FirstActivity : AppCompatActivity() {
+    private lateinit var influxDBService: InfluxDBService
     private lateinit var gnssDataLayout: LinearLayout
     private lateinit var gnssPlotView: GnssPlotView_SVID_CN
     private lateinit var locationManager: LocationManager
     private lateinit var gnssMeasurementsListener: GnssMeasurementsEvent.Callback
     private val maxTextViews = 15
 
+    //coses de demanar a la DB
+    fun createRetrofitService(): Retrofit {
+        val logging = HttpLoggingInterceptor()
+        logging.setLevel(HttpLoggingInterceptor.Level.BODY)
+
+        val client = OkHttpClient.Builder()
+            .addInterceptor(logging)
+            .addInterceptor { chain ->
+                val request = chain.request()
+                val authenticatedRequest = request.newBuilder()
+                    .header("Authorization", Credentials.basic("geriigarcia", "20501aed2466b193"))
+                    .build()
+                chain.proceed(authenticatedRequest)
+            }
+            .build()
+
+        return Retrofit.Builder()
+            .baseUrl("http://84.247.188.251:8086/")
+            .client(client)
+            .addConverterFactory(ScalarsConverterFactory.create())
+            .build()
+    }
+
     @SuppressLint("MissingInflatedId")
     override fun onCreate(savedInstanceState: Bundle?) {
+
+        //INICI DB STUFF
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+        influxDBService = createRetrofitService().create(InfluxDBService::class.java)
+
+        findViewById<Button>(R.id.button3).setOnClickListener {
+            startActivity(Intent(this, FirstActivity::class.java))
+        }
+
+        //FINAL DB STUFF
+        
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_second)
 
@@ -81,12 +136,30 @@ class FirstActivity : AppCompatActivity() {
             locationManager.registerGnssMeasurementsCallback(gnssMeasurementsListener)
         }
 
-
-
-
     }
 
+    //DB STUFF
+    private fun buildDataLine(): String {
+        return "Raw AccumulatedDeltaRangeMeters=1584286.5679329718,AccumulatedDeltaRangeState=16.0"
+    }
 
+    private fun sendDataToInfluxDB(data: String) {
+        influxDBService.writeData(data).enqueue(object : Callback<Void> {
+            override fun onResponse(call: Call<Void>, response: Response<Void>) {
+                if (response.isSuccessful) {
+                    Toast.makeText(this@FirstActivity, "Data sent successfully to InfluxDB", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(this@FirstActivity, "Failed to send data", Toast.LENGTH_SHORT).show()
+                }
+            }
+
+            override fun onFailure(call: Call<Void>, t: Throwable) {
+                Toast.makeText(this@FirstActivity, "Error: ${t.message}", Toast.LENGTH_SHORT).show()
+            }
+        })
+    }
+
+    //FIN
 
     private fun print_connected_satelites(event: GnssMeasurementsEvent): List<Pair<String, Int>> {
         val constellationColorMap = mapOf(
@@ -98,7 +171,7 @@ class FirstActivity : AppCompatActivity() {
             GnssStatus.CONSTELLATION_SBAS to Color.MAGENTA,
             GnssStatus.CONSTELLATION_UNKNOWN to Color.WHITE
         )
-
+        event.measurements.ra
         val filteredMeasurements = event.measurements.filter { measurement ->
             measurement.constellationType != GnssStatus.CONSTELLATION_UNKNOWN
         }
@@ -114,8 +187,12 @@ class FirstActivity : AppCompatActivity() {
                 GnssStatus.CONSTELLATION_SBAS -> "SBAS"
                 else -> "UNKNOWN"
             }
+            val data = buildDataLine()
+            sendDataToInfluxDB(data)
+
             val bgColor = constellationColorMap[constellationType] ?: Color.WHITE
             Pair("Satelite ID: ${measurement.svid} \t - Constellation: $constellationName", bgColor)
+
         }
 
         return formattedMeasurements
@@ -133,3 +210,121 @@ class FirstActivity : AppCompatActivity() {
     }
 
 }
+
+
+
+/*
+*
+*
+*
+*
+*
+*
+*
+*
+* package com.example.prova4;
+
+import android.content.Intent
+import android.os.Bundle
+import android.widget.Button
+import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
+import okhttp3.Credentials
+import okhttp3.OkHttpClient
+import okhttp3.logging.HttpLoggingInterceptor
+import retrofit2.Call
+import retrofit2.Callback
+import retrofit2.Response
+import retrofit2.Retrofit
+import retrofit2.converter.scalars.ScalarsConverterFactory
+import retrofit2.http.Body
+import retrofit2.http.POST
+
+
+interface InfluxDBService {
+    @POST("write?db=UABDB")
+    fun writeData(@Body data: String): Call<Void>
+}
+
+class MainActivity : AppCompatActivity() {
+    private lateinit var influxDBService: InfluxDBService
+
+    fun createRetrofitService(): Retrofit {
+        val logging = HttpLoggingInterceptor()
+        logging.setLevel(HttpLoggingInterceptor.Level.BODY)
+
+        val client = OkHttpClient.Builder()
+            .addInterceptor(logging)
+            .addInterceptor { chain ->
+                val request = chain.request()
+                val authenticatedRequest = request.newBuilder()
+                    .header("Authorization", Credentials.basic("geriigarcia", "20501aed2466b193"))
+                    .build()
+                chain.proceed(authenticatedRequest)
+            }
+            .build()
+
+        return Retrofit.Builder()
+            .baseUrl("http://84.247.188.251:8086/")
+            .client(client)
+            .addConverterFactory(ScalarsConverterFactory.create())
+            .build()
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+        influxDBService = createRetrofitService().create(InfluxDBService::class.java)
+
+        findViewById<Button>(R.id.button1).setOnClickListener {
+            val data = buildDataLine()
+            sendDataToInfluxDB(data)
+        }
+
+        findViewById<Button>(R.id.button3).setOnClickListener {
+            startActivity(Intent(this, FirstActivity::class.java))
+        }
+    }
+
+    private fun buildDataLine(): String {
+        return "Raw AccumulatedDeltaRangeMeters=1584286.5679329718,AccumulatedDeltaRangeState=16.0"
+    }
+
+    private fun sendDataToInfluxDB(data: String) {
+        influxDBService.writeData(data).enqueue(object : Callback<Void> {
+            override fun onResponse(call: Call<Void>, response: Response<Void>) {
+                if (response.isSuccessful) {
+                    Toast.makeText(this@MainActivity, "Data sent successfully to InfluxDB", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(this@MainActivity, "Failed to send data", Toast.LENGTH_SHORT).show()
+                }
+            }
+
+            override fun onFailure(call: Call<Void>, t: Throwable) {
+                Toast.makeText(this@MainActivity, "Error: ${t.message}", Toast.LENGTH_SHORT).show()
+            }
+        })
+    }
+}
+*
+* {'time': '2023-09-17T16:00:00Z', 'AccumulatedDeltaRangeMeters': 1584286.5679329718, 'AccumulatedDeltaRangeState': 16.0, 'AccumulatedDeltaRangeUncertaintyMeters': 0.004900000058114529, 'AgcDb': 4.0, 'BasebandCn0DbHz': 22.0, 'BiasNanos': 0.0, 'BiasUncertaintyNanos': 25.89488454489842, 'CarrierCycles': 0.0, 'CarrierFrequencyHz': 1602562560.0, 'CarrierPhase': 0.0, 'CarrierPhaseUncertainty': 0.0, 'ChipsetElapsedRealtimeNanos': 0, 'Cn0DbHz': 22.0, 'CodeType': 'C', 'ConstellationType': 3, 'DriftNanosPerSecond': 767.8170268204456, 'DriftUncertaintyNanosPerSecond': 0.0, 'FullBiasNanos': -1.378986809421e+18, 'FullInterSignalBiasNanos': 0.0, 'FullInterSignalBiasUncertaintyNanos': 0.0, 'HardwareClockDiscontinuityCount': 0, 'LeapSecond': 18, 'MultipathIndicator': 0.0, 'PseudorangeRateMetersPerSecond': -396.34449584646296, 'PseudorangeRateUncertaintyMetersPerSecond': 0.14999, 'ReceivedSvTimeNanos': 68399930290231, 'ReceivedSvTimeUncertaintyNanos': 396.0, 'SatelliteInterSignalBiasNanos': 51.7427469398681, 'SatelliteInterSignalBiasUncertaintyNanos': 66.7128, 'SnrInDb': 1.7700035039091215, 'State': 32995, 'Svid': 1, 'SvidTag': '1', 'TimeNanos': 14808580000000, 'TimeOffsetNanos': 0.0, 'TimeUncertaintyNanos': 25.89488454489842, 'utcTimeMillis': 1694966400000},
+
+*
+*
+*
+*
+*
+*
+*
+*
+*
+*
+*
+*
+*
+*
+*
+*
+*
+*
+* */
