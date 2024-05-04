@@ -49,7 +49,19 @@ class GnssPlotView_SVID_CN : View {
                 val top = height - (cn0Value / 60f) * height // Scale CN0 values to fit height
                 val right = left + barWidth
                 val bottom = height
+
                 it.drawRect(left, top, right, bottom, paint)
+
+                val textPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+                textPaint.color = Color.BLACK
+                textPaint.textAlign = Paint.Align.CENTER
+                val textX = (index + 1) * plotSpacing
+                val textY = height - 10f // Offset from the bottom
+                it.drawText("SvId: $svId", textX, textY, textPaint)
+
+                // Annotate Cn0DbHz value at the top of the column
+                it.drawText("Cn0DbHz: ${cn0Value.toInt()}", left + barWidth / 4, top - 10f, paint)
+
             }
         }
     }
