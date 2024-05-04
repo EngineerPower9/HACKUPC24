@@ -10,12 +10,10 @@ import android.location.LocationManager
 import android.os.Bundle
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 
-import android.content.Intent
-import android.widget.Button
-import android.widget.Toast
 import okhttp3.Credentials
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -69,16 +67,11 @@ class FirstActivity : AppCompatActivity() {
 
         //INICI DB STUFF
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
+        //setContentView(R.layout.activity_main)
         influxDBService = createRetrofitService().create(InfluxDBService::class.java)
 
-        findViewById<Button>(R.id.button3).setOnClickListener {
-            startActivity(Intent(this, FirstActivity::class.java))
-        }
-
         //FINAL DB STUFF
-        
-        super.onCreate(savedInstanceState)
+
         setContentView(R.layout.activity_second)
 
         gnssDataLayout = findViewById(R.id.gnssDataLayout)
@@ -139,9 +132,6 @@ class FirstActivity : AppCompatActivity() {
     }
 
     //DB STUFF
-    private fun buildDataLine(): String {
-        return "Raw AccumulatedDeltaRangeMeters=1584286.5679329718,AccumulatedDeltaRangeState=16.0"
-    }
 
     private fun sendDataToInfluxDB(data: String) {
         influxDBService.writeData(data).enqueue(object : Callback<Void> {
@@ -171,7 +161,8 @@ class FirstActivity : AppCompatActivity() {
             GnssStatus.CONSTELLATION_SBAS to Color.MAGENTA,
             GnssStatus.CONSTELLATION_UNKNOWN to Color.WHITE
         )
-        event.measurements.ra
+
+
         val filteredMeasurements = event.measurements.filter { measurement ->
             measurement.constellationType != GnssStatus.CONSTELLATION_UNKNOWN
         }
@@ -187,7 +178,35 @@ class FirstActivity : AppCompatActivity() {
                 GnssStatus.CONSTELLATION_SBAS -> "SBAS"
                 else -> "UNKNOWN"
             }
-            val data = buildDataLine()
+
+            val data = "Raw " +
+                    "AccumulatedDeltaRangeMeters=${measurement.accumulatedDeltaRangeMeters}," +
+                    "AccumulatedDeltaRangeState=${measurement.accumulatedDeltaRangeState}," +
+                    "AccumulatedDeltaRangeUncertaintyMeters=${measurement.accumulatedDeltaRangeUncertaintyMeters}," +
+                    "BasebandCn0DbHz=${measurement.basebandCn0DbHz}," +
+                    "BiasNanos=${measurement.satelliteInterSignalBiasNanos}," +
+                    "BiasUncertaintyNanos=${measurement.satelliteInterSignalBiasUncertaintyNanos}," +
+                    "CarrierCycles=${measurement.carrierCycles}," +
+                    "CarrierFrequencyHz=${measurement.carrierFrequencyHz}," +
+                    "CarrierPhase=${measurement.carrierPhase}," +
+                    "CarrierPhaseUncertainty=${measurement.carrierPhaseUncertainty}," +
+                    "Cn0DbHz=${measurement.cn0DbHz}," +
+                    "ConstellationType=${measurement.constellationType}," +
+                    "FullBiasNanos=${measurement.fullInterSignalBiasNanos}," +
+                    "FullInterSignalBiasNanos=${measurement.fullInterSignalBiasNanos}," +
+                    "FullInterSignalBiasUncertaintyNanos=${measurement.fullInterSignalBiasUncertaintyNanos}," +
+                    "MultipathIndicator=${measurement.multipathIndicator}," +
+                    "PseudorangeRateMetersPerSecond=${measurement.pseudorangeRateMetersPerSecond}," +
+                    "PseudorangeRateUncertaintyMetersPerSecond=${measurement.pseudorangeRateUncertaintyMetersPerSecond}," +
+                    "ReceivedSvTimeNanos=${measurement.receivedSvTimeNanos}," +
+                    "ReceivedSvTimeUncertaintyNanos=${measurement.receivedSvTimeUncertaintyNanos}," +
+                    "SatelliteInterSignalBiasNanos=${measurement.satelliteInterSignalBiasNanos}," +
+                    "SatelliteInterSignalBiasUncertaintyNanos=${measurement.satelliteInterSignalBiasUncertaintyNanos}," +
+                    "SnrInDb=${measurement.snrInDb}," +
+                    "State=${measurement.state}," +
+                    "Svid=${measurement.svid}," +
+                    "TimeOffsetNanos=${measurement.timeOffsetNanos}"
+
             sendDataToInfluxDB(data)
 
             val bgColor = constellationColorMap[constellationType] ?: Color.WHITE
@@ -310,7 +329,7 @@ class MainActivity : AppCompatActivity() {
 * {'time': '2023-09-17T16:00:00Z', 'AccumulatedDeltaRangeMeters': 1584286.5679329718, 'AccumulatedDeltaRangeState': 16.0, 'AccumulatedDeltaRangeUncertaintyMeters': 0.004900000058114529, 'AgcDb': 4.0, 'BasebandCn0DbHz': 22.0, 'BiasNanos': 0.0, 'BiasUncertaintyNanos': 25.89488454489842, 'CarrierCycles': 0.0, 'CarrierFrequencyHz': 1602562560.0, 'CarrierPhase': 0.0, 'CarrierPhaseUncertainty': 0.0, 'ChipsetElapsedRealtimeNanos': 0, 'Cn0DbHz': 22.0, 'CodeType': 'C', 'ConstellationType': 3, 'DriftNanosPerSecond': 767.8170268204456, 'DriftUncertaintyNanosPerSecond': 0.0, 'FullBiasNanos': -1.378986809421e+18, 'FullInterSignalBiasNanos': 0.0, 'FullInterSignalBiasUncertaintyNanos': 0.0, 'HardwareClockDiscontinuityCount': 0, 'LeapSecond': 18, 'MultipathIndicator': 0.0, 'PseudorangeRateMetersPerSecond': -396.34449584646296, 'PseudorangeRateUncertaintyMetersPerSecond': 0.14999, 'ReceivedSvTimeNanos': 68399930290231, 'ReceivedSvTimeUncertaintyNanos': 396.0, 'SatelliteInterSignalBiasNanos': 51.7427469398681, 'SatelliteInterSignalBiasUncertaintyNanos': 66.7128, 'SnrInDb': 1.7700035039091215, 'State': 32995, 'Svid': 1, 'SvidTag': '1', 'TimeNanos': 14808580000000, 'TimeOffsetNanos': 0.0, 'TimeUncertaintyNanos': 25.89488454489842, 'utcTimeMillis': 1694966400000},
 
 *
-*
+* [truncated]Raw AccumulatedDeltaRangeMeters=6620.74237064615,AccumulatedDeltaRangeState=17,AccumulatedDeltaRangeUncertaintyMeters=0.00271145859733223,BasebandCn0DbHz=0.0,BiasNanos=0.0,BiasUncertaintyNanos=0.0,CarrierCycles=-92233720368547
 *
 *
 *
