@@ -16,6 +16,7 @@ import androidx.core.app.ActivityCompat
 
 class SecondActivity : AppCompatActivity() {
     private lateinit var gnssDataLayout: LinearLayout
+    private lateinit var gnssPlotView: GnssPlotView_SVID_CN
     private lateinit var locationManager: LocationManager
     private lateinit var gnssMeasurementsListener: GnssMeasurementsEvent.Callback
     private val maxTextViews = 15
@@ -26,12 +27,18 @@ class SecondActivity : AppCompatActivity() {
         setContentView(R.layout.activity_second)
 
         gnssDataLayout = findViewById(R.id.gnssDataLayout)
+        gnssPlotView = findViewById(R.id.gnssPlotView)
         locationManager = getSystemService(LOCATION_SERVICE) as LocationManager
 
 
         gnssMeasurementsListener = object : GnssMeasurementsEvent.Callback() {
             override fun onGnssMeasurementsReceived(event: GnssMeasurementsEvent) {
+                // Primer grafic
                 val formattedMeasurements = print_connected_satelites(event)
+
+                val dataForPlot = prepareDataForPlot(event)
+
+
                 runOnUiThread {
 
                     formattedMeasurements.forEach { pair ->
@@ -43,7 +50,12 @@ class SecondActivity : AppCompatActivity() {
                         textView.setBackgroundColor(pair.second)
                         gnssDataLayout.addView(textView)
                     }
+
+
                 }
+
+                gnssPlotView.setPlots(dataForPlot.first, dataForPlot.second)
+
             }
 
             override fun onStatusChanged(status: Int) {
@@ -51,14 +63,9 @@ class SecondActivity : AppCompatActivity() {
             }
         }
 
-        if (ActivityCompat.checkSelfPermission(
-                this,
-                Manifest.permission.ACCESS_FINE_LOCATION
-            ) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(
-                this,
-                Manifest.permission.ACCESS_COARSE_LOCATION
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
+        // En cas de no disposar dels permisos
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED
+            && ActivityCompat.checkSelfPermission( this, Manifest.permission.ACCESS_COARSE_LOCATION ) != PackageManager.PERMISSION_GRANTED ) {
             ActivityCompat.requestPermissions(
                 this,
                 arrayOf(
@@ -73,6 +80,10 @@ class SecondActivity : AppCompatActivity() {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
             locationManager.registerGnssMeasurementsCallback(gnssMeasurementsListener)
         }
+
+
+
+
     }
 
 
@@ -111,6 +122,14 @@ class SecondActivity : AppCompatActivity() {
     }
 
 
-
+    private fun prepareDataForPlot(event: GnssMeasurementsEvent) : Pair<Map<Int, Float>, List<Int>> {
+        val formattedMeasurements =  event.measurements.map { measurement ->
+            Pair(measurement.svid, measurement.cn0DbHz.toFloat())
+        }
+        val constelacionTypes =  event.measurements.map { measurement ->
+            measurement.constellationType
+        }
+        return Pair(formattedMeasurements.toMap(),constelacionTypes)
+    }
 
 }
