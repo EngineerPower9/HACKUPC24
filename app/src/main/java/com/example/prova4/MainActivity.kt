@@ -16,6 +16,7 @@ import retrofit2.converter.scalars.ScalarsConverterFactory
 import retrofit2.http.Body
 import retrofit2.http.POST
 
+
 interface InfluxDBService {
     @POST("write?db=UABDB")
     fun writeData(@Body data: String): Call<Void>
