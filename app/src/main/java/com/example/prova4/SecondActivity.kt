@@ -4,21 +4,32 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import android.graphics.Color
+import android.location.GnssMeasurement
 import android.location.GnssMeasurementsEvent
 import android.location.GnssStatus
+import android.location.Location
 import android.location.LocationManager
 import android.os.Bundle
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationServices
 
 
 class SecondActivity : AppCompatActivity() {
     private lateinit var gnssDataLayout: LinearLayout
     private lateinit var gnssPlotView: GnssPlotView_SVID_CN
+    private lateinit var skyPlotView: SkyPlotView
+
     private lateinit var locationManager: LocationManager
     private lateinit var gnssMeasurementsListener: GnssMeasurementsEvent.Callback
+
+    private lateinit var fusedLocationClient: FusedLocationProviderClient
+    private lateinit var coordinatesTextView: TextView
+    private lateinit var altitudeTextView: TextView
+
     private val maxTextViews = 15
 
     @SuppressLint("MissingInflatedId")
@@ -28,18 +39,34 @@ class SecondActivity : AppCompatActivity() {
 
         gnssDataLayout = findViewById(R.id.gnssDataLayout)
         gnssPlotView = findViewById(R.id.gnssPlotView)
+        skyPlotView = findViewById(R.id.skyPlotView)
+
         locationManager = getSystemService(LOCATION_SERVICE) as LocationManager
+
+        coordinatesTextView = findViewById(R.id.coordinatesTextView)
+        altitudeTextView = findViewById(R.id.altitudeTextView)
+
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
 
 
         gnssMeasurementsListener = object : GnssMeasurementsEvent.Callback() {
             override fun onGnssMeasurementsReceived(event: GnssMeasurementsEvent) {
-                // Primer grafic
+                // We select the data for all the diferent views
                 val formattedMeasurements = print_connected_satelites(event)
 
                 val dataForPlot = prepareDataForPlot(event)
 
 
+                val satellitePositions = mapOf(
+                    1 to Pair(45f, 30f), // Example position for SvId 1 (azimuth: 45 degrees, elevation: 30 degrees)
+                    2 to Pair(90f, 60f),
+                    3 to Pair(90f, 20f), // Example position for SvId 2
+                    // Add more satellite positions as needed
+                )
+
                 runOnUiThread {
+
+
 
                     formattedMeasurements.forEach { pair ->
                         val textView = TextView(this@SecondActivity)
@@ -51,10 +78,19 @@ class SecondActivity : AppCompatActivity() {
                         gnssDataLayout.addView(textView)
                     }
 
+                    gnssPlotView.setPlots(dataForPlot.first, dataForPlot.second)
+                    skyPlotView.setSatellitePositions(satellitePositions)
+
+
+
 
                 }
 
-                gnssPlotView.setPlots(dataForPlot.first, dataForPlot.second)
+
+
+
+
+
 
             }
 
@@ -81,7 +117,12 @@ class SecondActivity : AppCompatActivity() {
             locationManager.registerGnssMeasurementsCallback(gnssMeasurementsListener)
         }
 
-
+        fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+            if (location != null) {
+                coordinatesTextView.text = formatCoordinates(location.latitude, location.longitude).toString()
+                altitudeTextView.text = "Altitude: " + location.altitude.toInt().toString() + " m"
+            }
+        }
 
 
     }
@@ -114,13 +155,16 @@ class SecondActivity : AppCompatActivity() {
                 GnssStatus.CONSTELLATION_SBAS -> "SBAS"
                 else -> "UNKNOWN"
             }
+
+
             val bgColor = constellationColorMap[constellationType] ?: Color.WHITE
             Pair("Satelite ID: ${measurement.svid} \t - Constellation: $constellationName", bgColor)
         }
 
+
+
         return formattedMeasurements
     }
-
 
     private fun prepareDataForPlot(event: GnssMeasurementsEvent) : Pair<Map<Int, Float>, List<Int>> {
         val formattedMeasurements =  event.measurements.map { measurement ->
@@ -132,4 +176,33 @@ class SecondActivity : AppCompatActivity() {
         return Pair(formattedMeasurements.toMap(),constelacionTypes)
     }
 
+/*
+    private fun prepareDataForSkyView(event : GnssMeasurementsEvent, m : GnssMeasurement, l : Location) :  Map<Int, Pair<Float, Float>> {
+        event.measurements.map { measurement ->
+            val range = measurement.pseudorangeRateMetersPerSecond * measurement.timeOffsetNanos
+            val angle = m.xSatellitePosition
+
+        }
+
+
+
+        return
+    }
+*/
+    private fun formatCoordinates(latitude: Double, longitude: Double): Pair<String, String> {
+        val latDegrees = latitude.toInt()
+        val latMinutes = ((latitude - latDegrees) * 60).toInt()
+        val latSeconds = ((latitude - latDegrees - (latMinutes.toDouble() / 60)) * 3600).toInt()
+        val latDirection = if (latitude >= 0) "N" else "S"
+
+        val lonDegrees = longitude.toInt()
+        val lonMinutes = ((longitude - lonDegrees) * 60).toInt()
+        val lonSeconds = ((longitude - lonDegrees - (lonMinutes.toDouble() / 60)) * 3600).toInt()
+        val lonDirection = if (longitude >= 0) "E" else "W"
+
+        val latString = "$latDegrees°$latMinutes'$latSeconds\"$latDirection"
+        val lonString = "$lonDegrees°$lonMinutes'$lonSeconds\"$lonDirection"
+
+        return Pair(latString, lonString)
+    }
 }
