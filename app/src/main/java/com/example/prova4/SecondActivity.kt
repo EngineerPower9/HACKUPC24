@@ -53,21 +53,19 @@ class SecondActivity : AppCompatActivity() {
             override fun onGnssMeasurementsReceived(event: GnssMeasurementsEvent) {
                 // We select the data for all the diferent views
                 val formattedMeasurements = print_connected_satelites(event)
-
                 val dataForPlot = prepareDataForPlot(event)
 
-
+                // This is for the SkyMap (we should change)
                 val satellitePositions = mapOf(
                     1 to Pair(45f, 30f), // Example position for SvId 1 (azimuth: 45 degrees, elevation: 30 degrees)
                     2 to Pair(90f, 60f),
-                    3 to Pair(90f, 20f), // Example position for SvId 2
+                    3 to Pair(175f, 20f),
                     // Add more satellite positions as needed
                 )
 
                 runOnUiThread {
 
-
-
+                    // This code detects and updates the interactions
                     formattedMeasurements.forEach { pair ->
                         val textView = TextView(this@SecondActivity)
                         if (gnssDataLayout.childCount == maxTextViews) {
@@ -78,24 +76,11 @@ class SecondActivity : AppCompatActivity() {
                         gnssDataLayout.addView(textView)
                     }
 
+                    // This shows the Tables and Sky Plots
                     gnssPlotView.setPlots(dataForPlot.first, dataForPlot.second)
                     skyPlotView.setSatellitePositions(satellitePositions)
 
-
-
-
                 }
-
-
-
-
-
-
-
-            }
-
-            override fun onStatusChanged(status: Int) {
-                // Handle status changes if needed
             }
         }
 

@@ -25,18 +25,35 @@ import retrofit2.converter.scalars.ScalarsConverterFactory
 import retrofit2.http.Body
 import retrofit2.http.POST
 
+import android.location.GnssMeasurement
+import android.location.Location
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationServices
 
-interface InfluxDBService {
+
+interface InfluxDBService { // Database stuff
     @POST("write?db=UABDB")
     fun writeData(@Body data: String): Call<Void>
 }
 
 class FirstActivity : AppCompatActivity() {
-    private lateinit var influxDBService: InfluxDBService
+    // View layouts
     private lateinit var gnssDataLayout: LinearLayout
     private lateinit var gnssPlotView: GnssPlotView_SVID_CN
+    private lateinit var skyPlotView: SkyPlotView
+
+    // location and GNSS
     private lateinit var locationManager: LocationManager
     private lateinit var gnssMeasurementsListener: GnssMeasurementsEvent.Callback
+
+    //  Other
+    private lateinit var fusedLocationClient: FusedLocationProviderClient
+    private lateinit var coordinatesTextView: TextView
+    private lateinit var altitudeTextView: TextView
+
+    // database
+    private lateinit var influxDBService: InfluxDBService
+
     private val maxTextViews = 15
 
     //coses de demanar a la DB
@@ -64,31 +81,47 @@ class FirstActivity : AppCompatActivity() {
 
     @SuppressLint("MissingInflatedId")
     override fun onCreate(savedInstanceState: Bundle?) {
-
-        //INICI DB STUFF
         super.onCreate(savedInstanceState)
-        //setContentView(R.layout.activity_main)
+        setContentView(R.layout.activity_first)
+
+        // create influx DB
         influxDBService = createRetrofitService().create(InfluxDBService::class.java)
 
-        //FINAL DB STUFF
-
-        setContentView(R.layout.activity_second)
-
+        // Layouts and Views
         gnssDataLayout = findViewById(R.id.gnssDataLayout)
         gnssPlotView = findViewById(R.id.gnssPlotView)
+        skyPlotView = findViewById(R.id.skyPlotView)
+
+        // Location
         locationManager = getSystemService(LOCATION_SERVICE) as LocationManager
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
 
+        // Texts
+        coordinatesTextView = findViewById(R.id.coordinatesTextView)
+        altitudeTextView = findViewById(R.id.altitudeTextView)
 
+        // The following function will execute each time we recieve data from the satelites
         gnssMeasurementsListener = object : GnssMeasurementsEvent.Callback() {
             override fun onGnssMeasurementsReceived(event: GnssMeasurementsEvent) {
-                // Primer grafic
+                // We select the data for all the diferent views
                 val formattedMeasurements = print_connected_satelites(event)
-
                 val dataForPlot = prepareDataForPlot(event)
+
+                // This is for the SkyMap (we should change)
+                val satellitePositions = mapOf(
+                    1 to Pair(
+                        45f,
+                        30f
+                    ), // Example position for SvId 1 (azimuth: 45 degrees, elevation: 30 degrees)
+                    2 to Pair(90f, 60f),
+                    3 to Pair(175f, 20f),
+                    // Add more satellite positions as needed
+                )
 
 
                 runOnUiThread {
 
+                    // This code detects and updates the interactions
                     formattedMeasurements.forEach { pair ->
                         val textView = TextView(this@FirstActivity)
                         if (gnssDataLayout.childCount == maxTextViews) {
@@ -99,19 +132,15 @@ class FirstActivity : AppCompatActivity() {
                         gnssDataLayout.addView(textView)
                     }
 
+                    // This shows the Tables and Sky Plots
+                    gnssPlotView.setPlots(dataForPlot.first, dataForPlot.second)
+                    skyPlotView.setSatellitePositions(satellitePositions)
 
                 }
-
-                gnssPlotView.setPlots(dataForPlot.first, dataForPlot.second)
-
-            }
-
-            override fun onStatusChanged(status: Int) {
-                // Handle status changes if needed
             }
         }
 
-        // En cas de no disposar dels permisos
+        // We check the permisions
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED
             && ActivityCompat.checkSelfPermission( this, Manifest.permission.ACCESS_COARSE_LOCATION ) != PackageManager.PERMISSION_GRANTED ) {
             ActivityCompat.requestPermissions(
@@ -129,10 +158,18 @@ class FirstActivity : AppCompatActivity() {
             locationManager.registerGnssMeasurementsCallback(gnssMeasurementsListener)
         }
 
+        // Here we show the latitude, longitude and height
+        fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+            if (location != null) {
+                coordinatesTextView.text = formatCoordinates(location.latitude, location.longitude).toString()
+                altitudeTextView.text = "Altitude: " + location.altitude.toInt().toString() + " m"
+            }
+        }
+
     }
 
-    //DB STUFF
 
+    // DB functions
     private fun sendDataToInfluxDB(data: String) {
         influxDBService.writeData(data).enqueue(object : Callback<Void> {
             override fun onResponse(call: Call<Void>, response: Response<Void>) {
@@ -149,8 +186,8 @@ class FirstActivity : AppCompatActivity() {
         })
     }
 
-    //FIN
 
+    // The next functions returns a list of satelite data
     private fun print_connected_satelites(event: GnssMeasurementsEvent): List<Pair<String, Int>> {
         val constellationColorMap = mapOf(
             GnssStatus.CONSTELLATION_GPS to Color.rgb(255,153,153),
@@ -179,6 +216,7 @@ class FirstActivity : AppCompatActivity() {
                 else -> "UNKNOWN"
             }
 
+            // This next bit sends data to the server
             val data = "Raw " +
                     "AccumulatedDeltaRangeMeters=${measurement.accumulatedDeltaRangeMeters}," +
                     "AccumulatedDeltaRangeState=${measurement.accumulatedDeltaRangeState}," +
@@ -226,6 +264,23 @@ class FirstActivity : AppCompatActivity() {
             measurement.constellationType
         }
         return Pair(formattedMeasurements.toMap(),constelacionTypes)
+    }
+
+    private fun formatCoordinates(latitude: Double, longitude: Double): Pair<String, String> {
+        val latDegrees = latitude.toInt()
+        val latMinutes = ((latitude - latDegrees) * 60).toInt()
+        val latSeconds = ((latitude - latDegrees - (latMinutes.toDouble() / 60)) * 3600).toInt()
+        val latDirection = if (latitude >= 0) "N" else "S"
+
+        val lonDegrees = longitude.toInt()
+        val lonMinutes = ((longitude - lonDegrees) * 60).toInt()
+        val lonSeconds = ((longitude - lonDegrees - (lonMinutes.toDouble() / 60)) * 3600).toInt()
+        val lonDirection = if (longitude >= 0) "E" else "W"
+
+        val latString = "$latDegrees°$latMinutes'$latSeconds\"$latDirection"
+        val lonString = "$lonDegrees°$lonMinutes'$lonSeconds\"$lonDirection"
+
+        return Pair(latString, lonString)
     }
 
 }
